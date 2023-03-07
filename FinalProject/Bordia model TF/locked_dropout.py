@@ -2,8 +2,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 
-class LockedDropout(tf.keras.Model):
-    """ Way to apply dropout to inputs in a consistent way across all time steps of RNN
+class LockedDropout(tf.keras.layers.Layer):
+    """ Dropout Layer that is applied to inputs in a consistent way across all time steps of RNN
         can help prevent overfitting and improve generalization performance
         Idea is from a paper, originally same mask is applied across time steps of rnn,
         this implementation generates a new mask for each forward pass which is then applied across all time steps
