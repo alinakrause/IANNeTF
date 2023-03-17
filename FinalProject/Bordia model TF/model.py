@@ -11,7 +11,7 @@ class RNNModel(tf.keras.Model):
         - tying weights not (yet?) implemented
         - dropouts often simplified (but should do approximately the same?)
     """
-    def __init__(self, ntoken, ninp, nhid, nlayers, ers, dropout=0.5, dropouth=0.5, dropouti=0.5, dropoute=0.1, wdrop=0):
+    def __init__(self, ntoken, ninp, nhid, nlayers, dropout=0.5, dropouth=0.5, dropouti=0.5, dropoute=0.1, wdrop=0):
         """ arguments:
         ntoken (int): vocabulary size
         ninp (int): size of word embeddings -> called with 400
