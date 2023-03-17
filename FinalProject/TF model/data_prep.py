@@ -70,7 +70,7 @@ def tokenize_data(datasets, voc_size):
     return tokenizer, datasets
 
 
-def data_preprocessing(data, batch_size, bptt):
+def data_preprocessing(data, batch_size, bptt, evaluation=False):
     """
     Slices the input data into sequences of varying lengths and creates a dataset with input and target sequences.
 
@@ -84,24 +84,29 @@ def data_preprocessing(data, batch_size, bptt):
     """
 
     # slicing the whole data into differently sized sequences
-    inputs = []
+    sequences = []
     max_seq_len = 0 # largest sequence length
     i = 0 # index for iterating whole data list
     while i < len(data):
-        # generate random sequence length dependend on bptt
-        bptt = bptt if np.random.random() < 0.95 else bptt / 2.
-        seq_len = max(5, int(np.random.normal(bptt, 5)))
+        if not evaluation:
+            # generate random sequence length dependend on bptt
+            bptt = bptt if np.random.random() < 0.95 else bptt / 2.
+            seq_len = max(5, int(np.random.normal(bptt, 5)))
+        else:
+            seq_len = bptt
+        # check if sequence length is less or equal to remainder of data
+        seq_len = min(seq_len, len(data) - i)
 
         # slice sequence (+1 is for target set)
         sequence = data[i:i+seq_len+1]
-        inputs.append(sequence)
+        sequences.append(sequence)
 
         # update largest sequence length and iterating index
         max_seq_len = seq_len if max_seq_len < seq_len else max_seq_len
         i += seq_len
 
     # pad sequences and make it into dataset with input and target sequence
-    sequences = tf.keras.utils.pad_sequences(inputs, maxlen=max_seq_len+1)
+    sequences = tf.keras.utils.pad_sequences(sequences, maxlen=max_seq_len+1)
     data = tf.data.Dataset.from_tensor_slices((sequences))
     data = data.map(lambda x: (x[:max_seq_len], x[1:]))
 
