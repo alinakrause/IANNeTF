@@ -25,14 +25,20 @@ def load_data(path):
         list of str: A list of texts, where each text is a string containing the articles for the corresponding data set.
     """
 
-    # read articles from text file
-    read_file = open(os.path.join(path, "articles.txt"), 'r', encoding='utf-8')
-    text = read_file.read()
-    read_file.close()
+    # read articles chunk-wise from text file and filter it
+    text = ""
+    with open(os.path.join(path, "articles.txt"), 'r', encoding='utf-8') as f:
+        chunk_size = 1024 * 1024 # 1MB chunk size
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
 
-    # filter text + add eos marker
-    text = text.replace('@highlight', '').replace('\n\n', ' eos ').lower()
-    text = re.sub(r"[^a-z ]", "", text)
+            # filter text + add eos marker
+            chunk = chunk.replace('@highlight', '').replace('\n\n', ' eos ').lower()
+            chunk = re.sub(r"[^a-z ]", "", chunk)
+
+            text += chunk
 
     # split text in train, validation and test set
     l = len(text)
