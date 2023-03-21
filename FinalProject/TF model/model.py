@@ -11,38 +11,40 @@ class RNNModel(tf.keras.Model):
     The model is inspried from the PyTorch implementation "LSTM Language Model Toolkit" by Salesforce:
     https://github.com/salesforce/awd-lstm-lm
     """
-    def __init__(self, lr, ntoken, ninp, nhid, nlayers, dropout=0.5, dropouth=0.5, dropouti=0.5, dropoute=0.1, wdrop=0):
+    def __init__(self, args):
         """
         Initializes the RNN model (encoder, decoder and lstm layers) with the given hyperparameters.
 
         Args:
-            lr (float): learning rate for the Adam optimizer
-            ntoken (int): vocabulary size
-            ninp (int): size of word embeddings
-            nhid (int): number of hidden units per layer
-            nlayers (int): number of layers
-            dropout (float): dropout rate applied to the output of each LSTM layer (default: 0.5)
-            dropouth (float): dropout rate applied to the output of each LSTM layer (default: 0.5)
-            dropouti (float): dropout rate applied to the embedding layer (default: 0.5)
-            dropoute (float): dropout rate applied to remove words from the embedding layer (default: 0.1)
-            wdrop (float): dropout rate applied to the RNN hidden-to-hidden matrix (default: 0)
+            args (argparse.ArgumentParser): ArgumentParser containing hyperparameters for the model and training.
+            -> used arguments of ArgumentParser:
+                lr (float): learning rate for the Adam optimizer
+                vocabulary_size (int): vocabulary size
+                ninp (int): size of word embeddings
+                nhid (int): number of hidden units per layer
+                nlayers (int): number of layers
+                dropout (float): dropout rate applied to the output of each LSTM layer (default: 0.5)
+                dropouth (float): dropout rate applied to the output of each LSTM layer (default: 0.5)
+                dropouti (float): dropout rate applied to the embedding layer (default: 0.5)
+                dropoute (float): dropout rate applied to remove words from the embedding layer (default: 0.1)
+                wdrop (float): dropout rate applied to the RNN hidden-to-hidden matrix (default: 0)
         """
         super().__init__()
 
         # training necessities
         self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
         self.metrics_list = [tf.keras.metrics.Mean(name="loss")]
 
         # parameters
-        self.voc_size = ntoken      # vocabulary size
-        self.ninp = ninp            # size of word embedding
-        self.nhid = nhid            # number of hidden units (in rnn layers)
-        self.nlayers = nlayers      # number of rnn layers
-        self.dropout = dropout      # dropout for overall output of rnn layers
-        self.dropouti = dropouti    # dropout for embedding output
-        self.dropouth = dropouth    # dropout for rnn layers
-        self.dropoute = dropoute    # dropout for embedding layer
+        self.voc_size = args.vocabulary:size
+        self.ninp = args.ninp            # size of word embedding
+        self.nhid = args.nhid            # number of hidden units (in rnn layers)
+        self.nlayers = args.nlayers      # number of rnn layers
+        self.dropout = args.dropout      # dropout for overall output of rnn layers
+        self.dropouti = args.dropouti    # dropout for embedding output
+        self.dropouth = args.dropouth    # dropout for rnn layers
+        self.dropoute = args.dropoute    # dropout for embedding layer
 
         self.lockdrop = LockedDropout() # dropout wrapper
 
@@ -129,7 +131,7 @@ class RNNModel(tf.keras.Model):
             metric.reset_states()
 
     #@tf.function
-    def train_step(self, data, hidden, cell, D, N, var_ratio, lmbda, debiasing=True, alpha=0, beta=0,  norm=True):
+    def train_step(self, data, hidden, cell, D, N, norm=True):
         """
         Perform one training step for a given batch of data.
 
@@ -139,11 +141,6 @@ class RNNModel(tf.keras.Model):
             cell (list): A list of cell states for each RNN layer.
             D (tf.Tensor): A tensor of shape (d,) representing the gender direction vector.
             N (tf.Tensor): A tensor of shape (d, n) representing the bias subspace.
-            var_ratio (float): The variance ratio used in the bias regularization term.
-            lmbda (float): The regularization parameter used in the bias regularization term.
-            debiasing (bool): Whether to apply bias regularization (default=True).
-            alpha (float): The L2 regularization parameter (default=0).
-            beta (float): The slowness regularization parameter (default=0).
             norm (bool): Whether to normalize the gender direction vector (default=True).
 
         Returns:
@@ -164,17 +161,17 @@ class RNNModel(tf.keras.Model):
             loss = self.loss_function(targets, predictions) + tf.reduce_sum(self.losses)#+ bias_loss
 
             # activation regularization (L2 regularization)
-            if alpha > 0:
-                alpha_loss = tf.reduce_sum(alpha * tf.mean(tf.pow(output, 2)) for output in dropped_outputs[-1:])
+            if args.alpha > 0:
+                alpha_loss = tf.reduce_sum(args.alpha * tf.mean(tf.pow(output, 2)) for output in dropped_outputs[-1:])
                 loss += alpha_loss
             # temporal activation regualrization (slowness regularization)
-            if beta > 0:
-                beta_loss = tf.reduce_sum(beta * tf.mean(tf.pow(output[1:] - output[:-1], 2)) for output in raw_outputs[-1:])
+            if args.beta > 0:
+                beta_loss = tf.reduce_sum(args.beta * tf.mean(tf.pow(output[1:] - output[:-1], 2)) for output in raw_outputs[-1:])
                 loss += beta_loss
 
             #bias regularization is calculated using gender pairs and neutral words
-            if debiasing:
-                bias_loss = bias_regularization_encoder(self, D, N, var_ratio, lmbda, norm=True)
+            if args.debiasing:
+                bias_loss = bias_regularization_encoder(self, D, N, args.var_ratio, lmbda, norm=True)
                 loss += bias_loss
 
         # gradients are applied to the trainable parameters
