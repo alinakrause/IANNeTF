@@ -37,7 +37,7 @@ class RNNModel(tf.keras.Model):
         self.metrics_list = [tf.keras.metrics.Mean(name="loss")]
 
         # parameters
-        self.voc_size = args.vocabulary:size
+        self.voc_size = args.vocabulary_size
         self.ninp = args.ninp            # size of word embedding
         self.nhid = args.nhid            # number of hidden units (in rnn layers)
         self.nlayers = args.nlayers      # number of rnn layers
@@ -52,12 +52,12 @@ class RNNModel(tf.keras.Model):
         # weights initialized with uniform distribution (-0.1, 0.1)
         initrange = 0.1
         self.encoder = tf.keras.layers.Embedding(
-            input_dim=ntoken,
-            output_dim=ninp,
+            input_dim=self.ntoken,
+            output_dim=self.ninp,
             embeddings_initializer=tf.keras.initializers.RandomUniform(-initrange, initrange)
         )
         self.decoder = tf.keras.layers.Dense(
-            units=ntoken,
+            units=self.ntoken,
             kernel_initializer=tf.keras.initializers.RandomUniform(-initrange, initrange)
         )
         ## tying weights
@@ -66,7 +66,7 @@ class RNNModel(tf.keras.Model):
         # rnn layers
         # wdrop: amount of weight dropout to apply to the RNN hidden to hidden matrix (for lstm: recurrent_kernel)
         ## tying weights
-        self.rnns = [tf.keras.layers.LSTM(units=nhid, recurrent_dropout=wdrop, return_state=True, return_sequences=True) for n in range(self.nlayers)]
+        self.rnns = [tf.keras.layers.LSTM(units=self.nhid, recurrent_dropout=self.wdrop, return_state=True, return_sequences=True) for n in range(self.nlayers)]
 
 
     def call(self, input, hidden, cell, return_h=False, training=False):
@@ -131,7 +131,7 @@ class RNNModel(tf.keras.Model):
             metric.reset_states()
 
     #@tf.function
-    def train_step(self, data, hidden, cell, D, N, norm=True):
+    def train_step(self, data, hidden, cell, D, N, args, norm=True):
         """
         Perform one training step for a given batch of data.
 
@@ -171,7 +171,7 @@ class RNNModel(tf.keras.Model):
 
             #bias regularization is calculated using gender pairs and neutral words
             if args.debiasing:
-                bias_loss = bias_regularization_encoder(self, D, N, args.var_ratio, lmbda, norm=True)
+                bias_loss = bias_regularization_encoder(self, D, N, args.var_ratio, args.lmbda, norm=True)
                 loss += bias_loss
 
         # gradients are applied to the trainable parameters

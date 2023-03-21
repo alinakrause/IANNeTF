@@ -2,7 +2,7 @@ import pprint
 import tqdm
 from get_sets import get_gender_pairs
 
-def training_loop(model, train_ds, val_ds, arguments, train_summary_writer, val_summary_writer):
+def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer, val_summary_writer):
     """
     Trains a given model on the provided training dataset, and evaluates it on a validation dataset for a given number
     of epochs. Calculates training and validation metrics, and logs them to tensorboard.

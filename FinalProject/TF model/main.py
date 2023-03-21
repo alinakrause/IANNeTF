@@ -23,11 +23,10 @@ parser.add_argument('--alpha', type=float, default=2.0, help='parameter for L2 r
 parser.add_argument('--beta', type=float, default=1.0, help='parameter for slowness regularization applied on RNN activiation (beta = 0 means no regularization)')
 parser.add_argument('--patience', type=int, default=10, help='early stopping patience (if -1, early stopping is not used)')
 # model
-parser.add_argument('--nlayers', type=inp, default=0.5, help='amount of rnn layers in the model')
+parser.add_argument('--nlayers', type=int, default=0.5, help='amount of rnn layers in the model')
 parser.add_argument('--lr', type=float, default=30, help='initial learning rate')
 parser.add_argument('--ninp', type=int, default=400, help='size of word embedding')
 parser.add_argument('--nhid', type=int, default=1150, help='number of hidden units per layer')
-parser.add_argument('--ninp', type=int, default=400, help='size of word embedding')
 parser.add_argument('--dropout', type=float, default=0.4, help='dropout applied to layers (0 = no dropout)')
 parser.add_argument('--dropouth', type=float, default=0.3, help='dropout for rnn layers (0 = no dropout)')
 parser.add_argument('--dropouti', type=float, default=0.65, help='dropout for input embedding layers (0 = no dropout)')
@@ -58,5 +57,6 @@ training_loop(model=model,
               train_ds=train_ds,
               val_ds=train_ds,
               arguments=args,
+              tokenizer=tokenizer,
               train_summary_writer=train_writer,
               val_summary_writer=val_writer)

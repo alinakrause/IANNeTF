@@ -1,4 +1,4 @@
-def get_gender_pairs(vocabulary_size):
+def get_gender_pairs(vocabulary_size, tokenizer):
     """
     Reads a list of gendered word pairs from a file, creates the defining set containing
     the tokenized gendered word pairs, and a set of neutral words containing all the tokens that are  not
