@@ -40,11 +40,10 @@ path = ""
 datasets = load_data(path)
 
 # tokenize datasets
-datasets, tokenizer = tokenize_data(datasets, args.vocabulary_size)
+tokenizer, datasets = tokenize_data(datasets, args.vocabulary_size)
 
 # preprocess datasets
-batch_sizes = [80, 10, 1]
-train_ds = data_preprocessing(datasets[0], args.train_bsz, args.ptt)
+train_ds = data_preprocessing(datasets[0], args.train_bsz, args.bptt)
 val_ds = data_preprocessing(datasets[1], args.val_bsz, args.bptt, evaluation=True)
 test_ds = data_preprocessing(datasets[2], args.test_bsz, args.bptt, evaluation=True)
 
@@ -56,7 +55,8 @@ train_writer, val_writer = config_name()
 training_loop(model=model,
               train_ds=train_ds,
               val_ds=train_ds,
-              arguments=args,
+              args=args,
               tokenizer=tokenizer,
               train_summary_writer=train_writer,
-              val_summary_writer=val_writer)
+              val_summary_writer=val_writer
+              )

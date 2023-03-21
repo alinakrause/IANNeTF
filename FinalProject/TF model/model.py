@@ -45,6 +45,7 @@ class RNNModel(tf.keras.Model):
         self.dropouti = args.dropouti    # dropout for embedding output
         self.dropouth = args.dropouth    # dropout for rnn layers
         self.dropoute = args.dropoute    # dropout for embedding layer
+        self.wdrop = args.wdrpo          # dropout for hidden weights matrix of lstm
 
         self.lockdrop = LockedDropout() # dropout wrapper
 
@@ -52,12 +53,12 @@ class RNNModel(tf.keras.Model):
         # weights initialized with uniform distribution (-0.1, 0.1)
         initrange = 0.1
         self.encoder = tf.keras.layers.Embedding(
-            input_dim=self.ntoken,
+            input_dim=self.voc_size,
             output_dim=self.ninp,
             embeddings_initializer=tf.keras.initializers.RandomUniform(-initrange, initrange)
         )
         self.decoder = tf.keras.layers.Dense(
-            units=self.ntoken,
+            units=self.voc_size,
             kernel_initializer=tf.keras.initializers.RandomUniform(-initrange, initrange)
         )
         ## tying weights
@@ -101,7 +102,7 @@ class RNNModel(tf.keras.Model):
 
         # pass embedding and the hidden state through all rnn layers
         for n, rnn in enumerate(self.rnns):
-            output, new_h, new_c = self.rnn(emb, initial_state=[hidden[0], cell[0]]) # call lstm
+            output, new_h, new_c = rnn(emb, initial_state=[hidden[n], cell[n]]) # call lstm
             new_hidden.append(new_h)
             new_cell.append(new_c)
             raw_outputs.append(output)
@@ -213,14 +214,14 @@ class RNNModel(tf.keras.Model):
         return {m.name: m.result() for m in self.metrics}, hidden, cell
 
 
-        def initialize_state(self, batch_size):
-            """
-            Returns an initial state for the model, consisting of zero-filled tensors for each layer of the model.
+    def initialize_state(self, batch_size):
+        """
+        Returns an initial state for the model, consisting of zero-filled tensors for each layer of the model.
 
-            Args:
-                batch_size: An integer representing the size of the input batch.
+        Args:
+            batch_size: An integer representing the size of the input batch.
 
-            Returns:
-                A list of tensors, one for each layer of the model, with shape [batch_size, self.nhid].
-            """
-            return [tf.zeros([batch_size, self.nhid]) for layer in range(self.nlayers)]
+        Returns:
+            A list of tensors, one for each layer of the model, with shape [batch_size, self.nhid].
+        """
+        return [tf.zeros([batch_size, self.nhid]) for layer in range(self.nlayers)]

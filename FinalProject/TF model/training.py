@@ -15,6 +15,8 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
         train_summary_writer (tensorflow.summary.SummaryWriter): The log writer for training metrics.
         val_summary_writer (tensorflow.summary.SummaryWriter): The log writer for validation metrics.
     """
+    stored_loss = 100000000
+    epochs_since_best_val_set = 0
     for epoch in range(args.epochs):
         print(f"Epoch {epoch+1}/{args.epochs}:")
 
@@ -59,3 +61,13 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
         model.reset_metrics()
 
         print("\n")
+
+        # check early stopping
+        if args.patience > 0:
+            if metrics["loss"] < stored_loss:
+                stored_loss = metrics["loss"]
+                epochs_since_best_val_set = 0
+            else:
+                epochs_since_best_val_set += 1
+                if epochs_since_best_val_set >= args.patience:
+                    epoch = args.epochs
