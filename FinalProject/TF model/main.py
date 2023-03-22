@@ -8,7 +8,7 @@ from model import RNNModel
 # set the hyperparameters
 parser = argparse.ArgumentParser(description="Hyperparameters for training RNN")
 # data
-parser.add_argument('--path', type=str, default="", help='path to folder where training data is stored')
+parser.add_argument('--path', type=str, default="", help='path to folder where training data and gender pairs are stored')
 parser.add_argument('--vocabulary_size', type=int, default=50000, help='size of the vocabulary of the corpus')
 parser.add_argument('--bptt', type=int, default=70, help='sequence length')
 parser.add_argument('--train_bsz', type=int, default=80, help='batch size for training dataset')
@@ -36,8 +36,7 @@ parser.add_argument('--wdrop', type=float, default=0.5, help='amount of weight d
 args = parser.parse_args()
 
 # load datasets
-path = ""
-datasets = load_data(path)
+datasets = load_data(args.path)
 
 # tokenize datasets
 tokenizer, datasets = tokenize_data(datasets, args.vocabulary_size)

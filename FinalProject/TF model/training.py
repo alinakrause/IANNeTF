@@ -20,7 +20,7 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
     for epoch in range(args.epochs):
         print(f"Epoch {epoch+1}/{args.epochs}:")
 
-        gender_words, D, N, eos_idx = get_gender_pairs(args.vocabulary_size)
+        gender_words, D, N, eos_idx = get_gender_pairs(args.path, args.vocabulary_size, tokenizer)
 
         # Training:
         hidden = model.initialize_state(args.train_bsz)

@@ -1,4 +1,7 @@
-def get_gender_pairs(vocabulary_size, tokenizer):
+import os
+import tensorflow as tf
+
+def get_gender_pairs(path, vocabulary_size, tokenizer):
     """
     Reads a list of gendered word pairs from a file, creates the defining set containing
     the tokenized gendered word pairs, and a set of neutral words containing all the tokens that are  not
@@ -15,7 +18,7 @@ def get_gender_pairs(vocabulary_size, tokenizer):
     """
 
     # read gender pairs file
-    with open("gender-pairs.txt", 'r') as f:
+    with open(os.path.join(path,"gender-pairs.txt"), 'r') as f:
         gender_pairs = f.readlines()
 
     # make gendered words lists
