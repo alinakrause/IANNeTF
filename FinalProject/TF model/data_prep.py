@@ -98,6 +98,7 @@ def data_preprocessing(data, batch_size, bptt, evaluation=False):
             # generate random sequence length dependend on bptt
             bptt = bptt if np.random.random() < 0.95 else bptt / 2.
             seq_len = max(5, int(np.random.normal(bptt, 5)))
+            seq_len = min(seq_len, 90) # upper bound for random sequence length
         else:
             seq_len = bptt
         # check if sequence length is less or equal to remainder of data

@@ -1,5 +1,5 @@
-import pprint
 import tqdm
+
 from get_sets import get_gender_pairs
 
 def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer, val_summary_writer):
@@ -11,7 +11,7 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
         model (tensorflow.keras.Model): The model to be trained.
         train_ds (tensorflow.data.Dataset): The training dataset.
         val_ds (tensorflow.data.Dataset): The validation dataset.
-        args (argparse.ArgumentParser): ArgumentParser containing all the hyperparamters.
+        args (argparse.ArgumentParser): ArgumentParser containing all the hyperparamters and necessary arguments.
         train_summary_writer (tensorflow.summary.SummaryWriter): The log writer for training metrics.
         val_summary_writer (tensorflow.summary.SummaryWriter): The log writer for validation metrics.
     """
@@ -71,3 +71,20 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
                 epochs_since_best_val_set += 1
                 if epochs_since_best_val_set >= args.patience:
                     epoch = args.epochs
+
+
+def testing(model, test_ds, args):
+    """
+    Runs a testing loop for the given model on the provided test dataset.
+
+    Args:
+        model: An tf.keras.Model to be tested.
+        test_ds: The dataset on which the model should be tested.
+        args: An argparse.ArgumentParser object containing all the hyperparamters and necessary arguments.
+    """
+    hidden = model.initialize_states(args.test_bsz)
+    cell = model.initialize_states(args.test_bsz)
+    for data in test_ds:
+        metrics, hidden, cell = model.test_step(data, hidden, cell)
+
+    print([f"test_{key}: {value.numpy()}" for (key, value) in metrics.items()])

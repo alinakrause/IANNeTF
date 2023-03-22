@@ -1,3 +1,5 @@
+import tensorflow as tf
+
 def bias_regularization_encoder(model, D, N, var_ratio, lmbda, norm=True):
     """
     Compute bias regularization loss term as described in the Bordia paper for the encoder of a given model.

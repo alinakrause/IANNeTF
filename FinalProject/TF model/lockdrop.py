@@ -33,3 +33,19 @@ class LockedDropout(tf.keras.layers.Layer):
         mask = tf.cast(tf.broadcast_to(mask, size), "float32")
 
         return mask * x # apply mask on input tensor
+
+def embed_drop(encoder, dropout):
+    """ 
+    Applies bernoulli dropout to the weights matrix of the input encoder layer.
+
+    Args:
+        encoder (tf.keras.layers.Layer): The input encoder layer.
+        dropout (float): The probability of dropping out a weight.
+    """
+    if dropout:
+        weights = encoder.get_weights()
+
+        mask = tfp.distributions.Bernoulli(probs=(1-dropout), dtype='float32').sample(sample_shape=(weights[0],1)) / (1 - dropout)
+        mask = tf.cast(tf.broadcast_to(mask, size), "float32").numpy()
+
+        encoder.set_weights(mask * weights)

@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from locked_dropout import LockedDropout
+from locked_dropout import LockedDropout, embed_drop
 from debiasing import bias_regularization_encoder
 
 class RNNModel(tf.keras.Model):
@@ -33,7 +33,8 @@ class RNNModel(tf.keras.Model):
 
         # training necessities
         self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
+        self.lr_scheduler = tf.keras.optimizers.schedules.ExponentialDecay(args.lr, 1, 0.966) # decays lr will be decayed with every batch that is processed by the optimizer
+        self.optimizer = tf.keras.optimizers.SGD(learning_rate=lr_scheduler, weight_decay=args.wdecay)
         self.metrics_list = [tf.keras.metrics.Mean(name="loss")]
 
         # parameters
@@ -46,6 +47,7 @@ class RNNModel(tf.keras.Model):
         self.dropouth = args.dropouth    # dropout for rnn layers
         self.dropoute = args.dropoute    # dropout for embedding layer
         self.wdrop = args.wdrpo          # dropout for hidden weights matrix of lstm
+        self.tie_weights = args.tie_weights
 
         self.lockdrop = LockedDropout() # dropout wrapper
 
@@ -61,13 +63,17 @@ class RNNModel(tf.keras.Model):
             units=self.voc_size,
             kernel_initializer=tf.keras.initializers.RandomUniform(-initrange, initrange)
         )
-        ## tying weights
+
+        # call encoder + decoder to get access to weights later in call methods
+        if self.tie_weights:
+            self.encoder(tf.keras.Input(shape=(self.voc_size, self.ninp)))
+            self.decoder(tf.keras.Input(shape=(self.ninp, self.voc_size)))
+
 
 
         # rnn layers
         # wdrop: amount of weight dropout to apply to the RNN hidden to hidden matrix (for lstm: recurrent_kernel)
-        ## tying weights
-        self.rnns = [tf.keras.layers.LSTM(units=self.nhid, recurrent_dropout=self.wdrop, return_state=True, return_sequences=True) for n in range(self.nlayers)]
+        self.rnns = [tf.keras.layers.LSTM(units=(self.nhid if not tie_weights and  n != self.nlayers-1 else ninp) , recurrent_dropout=self.wdrop, return_state=True, return_sequences=True) for n in range(self.nlayers)]
 
 
     def call(self, input, hidden, cell, return_h=False, training=False):
@@ -90,9 +96,10 @@ class RNNModel(tf.keras.Model):
                 raw_outputs (list): list of Tensors, each with shape [batch_size, sequence_length, hidden_size] that contains the outputs directly after each RNN layer.
                 outputs (list): list of Tensors, each with shape [batch_size, sequence_lenght, hidden_size] that contains the outputs of each RNN layer after dropout has been performed.
         """
+
         # embedding + dropout
+        embed_drop(self.encoder, self.dropoute)
         emb = self.encoder(input)
-        emb = self.lockdrop(emb, self.dropoute) # original: embed_regulariz
         emb = self.lockdrop(emb, self.dropouti)
 
         new_hidden = [] # stores hidden states of each rnn layer
@@ -118,6 +125,8 @@ class RNNModel(tf.keras.Model):
         cell = new_cell
 
         # decoding
+        if self.tie_weights:
+            self.decoder.set_weights(tf.transpose(self.encoder.get_weights()))
         decoded = self.decoder(output)
 
         if return_h:
@@ -177,6 +186,7 @@ class RNNModel(tf.keras.Model):
 
         # gradients are applied to the trainable parameters
         gradients = tape.gradient(loss, self.trainable_variables)
+        gradients, _ = tf.clip_by_global_norm(gradients, args.clip)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
 
         # update loss metric
