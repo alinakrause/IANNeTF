@@ -33,8 +33,8 @@ with open(os.path.join(path, "articles.txt"), 'r', encoding='utf-8') as f:
 
 # serialize tokenizer
 tokenizer_file = open(os.path.join(path, "tokenizer"), 'wb')
-pickle.dump(tokenizer, dict_file)
-dict_file.close()
+pickle.dump(tokenizer, tokenizer_file)
+tokenizer_file.close()
 print("tokenizer serialized")
 
 # tokenize text in chunks of 1000 sentences
