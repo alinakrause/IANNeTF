@@ -25,9 +25,7 @@ with open(os.path.join(path, "articles.txt"), 'r', encoding='utf-8') as f:
         chunk = re.sub(r"[^a-z ]", "", chunk)
 
         # train tokenizer
-        print("chunk added")
         tokenizer.fit_on_texts(chunk)
-        print("vocabulary updatet")
 
         text += chunk
 
@@ -49,7 +47,7 @@ for i in range(len(text)):
             tokens += tokenizer.texts_to_sequences([text[start:i+4]])[0]
             counter = 0
             start = i+1
-    print("tokenizing finished")
+print("tokenizing finished")
 
 # serialize the tokenized text and the word-token dictionary of the tokenizer
 tokens_file = open(os.path.join(path, "text_tokenized"), 'wb')
