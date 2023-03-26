@@ -9,12 +9,15 @@ import re
 import tensorflow as tf
 import pickle
 
+voc_size = 50000
 tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=voc_size)
+
 text = ""
+path = ""
 
 # read articles chunk-wise from text file and filter it
 with open(os.path.join(path, "articles.txt"), 'r', encoding='utf-8') as f:
-    lines = file.readlines()
+    lines = f.readlines()
 
 # filter text + add eos marker
 for line in lines:

@@ -10,7 +10,7 @@ import tqdm
 import pickle
 
 from data_prep import data_preprocessing
-from locked_dropout import LockedDropout, embed_drop
+from lockdrop import LockedDropout
 from debiasing import bias_regularization_encoder
 from endecoder import EncoderDecoder
 from model import RNNModel
@@ -57,14 +57,15 @@ assert tf.test.is_gpu_available()
 assert tf.test.is_built_with_cuda()
 
 # deserialsize tokenized text and Tokenizer
-tokens_file = open(os.path.join(path, "text_tokenized"), 'rb')
+tokens_file = open(os.path.join(args.path, "text_tokenized"), 'rb')
 text = pickle.load(tokens_file)
 tokens_file.close()
-tokenizer_file = open(os.path.join(path, "tokenizer"), 'rb')
+tokenizer_file = open(os.path.join(args.path, "tokenizer"), 'rb')
 tokenizer = pickle.load(tokenizer_file)
 tokenizer_file.close()
 
 # split into datasets (60-20-20 ratio)
+l = len(text)
 train_ds, val_ds, test_ds = [text[:int(l*.6)], text[int(l*.6):int(l*.8)], text[int(l*.8):]]
 
 # preprocess datasets
@@ -93,10 +94,10 @@ word_embeddings = model.encoder.weights[0]
 token_dict = tokenizer.word_index
 
 # serialize
-emb_file = open(os.path.join(path, "word_embedding_{bias}".format(bias = "debiased" if args.debiasing else "biased")), 'wb')
+emb_file = open(os.path.join(args.path, "word_embedding_{bias}".format(bias = "debiased" if args.debiasing else "biased")), 'wb')
 pickle.dump(word_embeddings, emb_file)
 emb_file.close()
-dict_file = open(os.path.join(path, "token_dictionary"), 'wb')
+dict_file = open(os.path.join(args.path, "token_dictionary"), 'wb')
 pickle.dump(token_dict, dict_file)
 dict_file.close()
 

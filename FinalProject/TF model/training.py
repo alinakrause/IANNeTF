@@ -15,7 +15,7 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
         train_summary_writer (tensorflow.summary.SummaryWriter): The log writer for training metrics.
         val_summary_writer (tensorflow.summary.SummaryWriter): The log writer for validation metrics.
     """
-    gender_words, D, N = get_gender_pairs(path, args.vocabulary_size, tokenizer)
+    gender_words, D, N = get_gender_pairs(args.path, args.vocabulary_size, tokenizer)
 
     stored_loss = 100000000
     epochs_since_best_val_set = 0

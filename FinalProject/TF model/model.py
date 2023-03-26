@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from locked_dropout import LockedDropout, embed_drop
+from lockdrop import LockedDropout
 from debiasing import bias_regularization_encoder
 from endecoder import EncoderDecoder
 
