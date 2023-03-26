@@ -1,7 +1,7 @@
 import os
 import tensorflow as tf
 
-def get_gender_pairs(path, vocabulary_size, word_index):
+def get_gender_pairs(path, vocabulary_size, tokenizer):
     """
     Reads a list of gendered word pairs from a file, creates the defining set containing
     the tokenized gendered word pairs, and a set of neutral words containing all the tokens that are  not
@@ -32,7 +32,7 @@ def get_gender_pairs(path, vocabulary_size, word_index):
     # defining set
     # D: tensor with gendered word pairs (tokenized)
     # shape: (number of gender pairs, 2)
-    word_index = word_index # tokenizer dict
+    word_index = tokenizer.word_index # tokenizer dict
     word2idx = {key: word_index[key] for key in list(word_index.keys())[:vocabulary_size]}
     D = tf.constant([[word2idx[wf], word2idx[wm]]
                      for wf, wm in zip(female_words, male_words)

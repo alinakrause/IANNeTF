@@ -60,9 +60,9 @@ assert tf.test.is_built_with_cuda()
 tokens_file = open(os.path.join(path, "text_tokenized"), 'rb')
 text = pickle.load(tokens_file)
 tokens_file.close()
-dict_file = open(os.path.join(path, "tokenizer_dict"), 'rb')
-word_index = pickle.load(dict_file)
-dict_file.close()
+tokenizer_file = open(os.path.join(path, "tokenizer"), 'rb')
+tokenizer = pickle.load(tokenizer_file)
+tokenizer_file.close()
 
 # split into datasets (60-20-20 ratio)
 train_ds, val_ds, test_ds = [text[:int(l*.6)], text[int(l*.6):int(l*.8)], text[int(l*.8):]]
