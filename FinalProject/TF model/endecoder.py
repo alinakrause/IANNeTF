@@ -1,3 +1,6 @@
+import tensorflow as tf
+import tensorflow_probability as tfp
+
 class EncoderDecoder(tf.keras.layers.Layer):
     # custom encoder and decoder layer
     # does what an embedding layer does + applies dropout to weights matrix
