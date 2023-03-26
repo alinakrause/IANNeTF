@@ -17,24 +17,33 @@ def bias_regularization_encoder(model, D, N, var_ratio, lmbda, norm=True):
     """
     # W: weights matrix of embedding
     # shape: (vocabulary size, embedding features)
-    W = model.encoder.get_weights()[0]
+    W = model.endecoder.weights[0]
     if norm:
         W = W / tf.norm(W, axis=1, keepdims=True)
 
     # C: differences btw gendered words (gender pairs)
     # shape: (number of gender pairs, embedding length)
-    C = []
+    #C = tf.TensorArray(tf.float32, size=0, dynamic_size=True, clear_after_read=False)
+    i = 0
+    Calt = []
     for idx in range(D.shape[0]):
         idxs = tf.reshape(D[idx], [-1])
         u = W[idxs[0],:] # vector for female word
         v = W[idxs[1],:] # vector for male counterpart
-        C.append(tf.reshape((u - v)/2, [1, -1])) # compute difference
-    C = tf.concat(C, axis=0)
+        Calt.append(tf.reshape((u - v)/2, [1, -1]))
+        if i == 0:
+            C = tf.reshape((u - v)/2, [1, -1])
+        else:
+            C = tf.concat([C, tf.reshape((u - v)/2, [1, -1])], axis=0)
+        i += 1
+
+
 
     # get principal components
     # Singular Value Decomposition: decomposes a matrix into three parts
     # returns: left singular vectors, singular values & right singular vectors of the input tensor
-    S, U, V = tf.linalg.svd(C, full_matrices=True)
+    S, U, V = tf.linalg.svd(C, full_matrices=False)
+
     # shape of S: (min(number of gender pairs, embedding length)) -> 1D vector
 
     # Find k such that we capture 100*var_ratio% of the gender variance
@@ -42,10 +51,10 @@ def bias_regularization_encoder(model, D, N, var_ratio, lmbda, norm=True):
     var = S**2
     norm_var = var/ tf.reduce_sum(var)
     cumul_norm_var = tf.math.cumsum(norm_var, axis=0)
-    k_idx = tf.math.argmin(cumul_norm_var[cumul_norm_var >= var_ratio])
+    k_idx = tf.math.argmin(cumul_norm_var[cumul_norm_var >= var_ratio], output_type="int32")
 
     # gender subspace B
-    B = V[:, :k_idx.numpy()+1] # all rows, first k columns
+    B = V[:, :k_idx+1] # all rows, first k+1 columns
     loss = tf.pow(tf.norm(tensor=tf.matmul(tf.gather(W, N-1), B), ord=2), 2)
 
     return lmbda * loss

@@ -1,7 +1,7 @@
 import os
 import tensorflow as tf
 
-def get_gender_pairs(path, vocabulary_size, tokenizer):
+def get_gender_pairs(path, vocabulary_size, word_index):
     """
     Reads a list of gendered word pairs from a file, creates the defining set containing
     the tokenized gendered word pairs, and a set of neutral words containing all the tokens that are  not
@@ -14,7 +14,6 @@ def get_gender_pairs(path, vocabulary_size, tokenizer):
         set: A set of gendered words (both male and female).
         tf.Tensor: A tensor of gendered word pairs, where each row is a pair of indices into the vocabulary.
         tf.Tensor: A tensor of neutral words, represented as indices into the vocabulary.
-        int: The index of the "end of sequence" token in the vocabulary.
     """
 
     # read gender pairs file
@@ -33,7 +32,7 @@ def get_gender_pairs(path, vocabulary_size, tokenizer):
     # defining set
     # D: tensor with gendered word pairs (tokenized)
     # shape: (number of gender pairs, 2)
-    word_index = tokenizer.word_index # tokenizer dict
+    word_index = word_index # tokenizer dict
     word2idx = {key: word_index[key] for key in list(word_index.keys())[:vocabulary_size]}
     D = tf.constant([[word2idx[wf], word2idx[wm]]
                      for wf, wm in zip(female_words, male_words)
@@ -43,6 +42,4 @@ def get_gender_pairs(path, vocabulary_size, tokenizer):
     # shape: (number of gender neutral words)
     N = tf.constant([word2idx[w] for w in word2idx if w not in gender_words])
 
-    eos_idx = word2idx['eos']
-
-    return gender_words, D, N, eos_idx
+    return gender_words, D, N

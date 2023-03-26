@@ -2,6 +2,7 @@ import tensorflow as tf
 
 from locked_dropout import LockedDropout, embed_drop
 from debiasing import bias_regularization_encoder
+from endecoder import EncoderDecoder
 
 class RNNModel(tf.keras.Model):
     """
@@ -32,9 +33,9 @@ class RNNModel(tf.keras.Model):
         super().__init__()
 
         # training necessities
-        self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-        self.lr_scheduler = tf.keras.optimizers.schedules.ExponentialDecay(args.lr, 1, 0.966) # decays lr will be decayed with every batch that is processed by the optimizer
-        self.optimizer = tf.keras.optimizers.SGD(learning_rate=lr_scheduler, weight_decay=args.wdecay)
+        self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)
+        lr_scheduler = tf.keras.optimizers.schedules.ExponentialDecay(30., 10, 0.9) # decays lr will be decayed with every batch that is processed by the optimizer
+        self.optimizer = tf.keras.optimizers.SGD(learning_rate=lr_scheduler, weight_decay=wdecay)
         self.metrics_list = [tf.keras.metrics.Mean(name="loss")]
 
         # parameters
@@ -46,37 +47,28 @@ class RNNModel(tf.keras.Model):
         self.dropouti = args.dropouti    # dropout for embedding output
         self.dropouth = args.dropouth    # dropout for rnn layers
         self.dropoute = args.dropoute    # dropout for embedding layer
-        self.wdrop = args.wdrpo          # dropout for hidden weights matrix of lstm
-        self.tie_weights = args.tie_weights
-
+        self.wdrop = args.wdrop         # dropout for hidden weights matrix of lstm
+        self.tie_weights = args.tie_weights # whether or not to tie encoder-decoder weights
         self.lockdrop = LockedDropout() # dropout wrapper
 
-        # encoder + decoder
+        # encoder/decoder
         # weights initialized with uniform distribution (-0.1, 0.1)
         initrange = 0.1
-        self.encoder = tf.keras.layers.Embedding(
-            input_dim=self.voc_size,
+        self.endecoder = EncoderDecoder(
+            input_dim=self.voc_size+1,
             output_dim=self.ninp,
+            dropout = self.dropoute,
             embeddings_initializer=tf.keras.initializers.RandomUniform(-initrange, initrange)
         )
-        self.decoder = tf.keras.layers.Dense(
-            units=self.voc_size,
-            kernel_initializer=tf.keras.initializers.RandomUniform(-initrange, initrange)
-        )
+        self.endecoder.build()
 
-        # call encoder + decoder to get access to weights later in call methods
-        if self.tie_weights:
-            self.encoder(tf.keras.Input(shape=(self.voc_size, self.ninp)))
-            self.decoder(tf.keras.Input(shape=(self.ninp, self.voc_size)))
-
-
-
-        # rnn layers
+        # rnn layers with L1 + L2 regularizer
         # wdrop: amount of weight dropout to apply to the RNN hidden to hidden matrix (for lstm: recurrent_kernel)
-        self.rnns = [tf.keras.layers.LSTM(units=(self.nhid if not tie_weights and  n != self.nlayers-1 else ninp) , recurrent_dropout=self.wdrop, return_state=True, return_sequences=True) for n in range(self.nlayers)]
+        reg = tf.keras.regularizers.L1L2(l1=0.001, l2=0.002)
+        self.rnns = [tf.keras.layers.LSTM(units=self.nhid if n != self.nlayers-1 else self.ninp, activity_regularizer=reg, recurrent_dropout=self.wdrop, return_state=True, return_sequences=True) for n in range(self.nlayers)]
 
 
-    def call(self, input, hidden, cell, return_h=False, training=False):
+    def call(self, input, training=False):
         """
         Forward pass of the model.
 
@@ -96,43 +88,22 @@ class RNNModel(tf.keras.Model):
                 raw_outputs (list): list of Tensors, each with shape [batch_size, sequence_length, hidden_size] that contains the outputs directly after each RNN layer.
                 outputs (list): list of Tensors, each with shape [batch_size, sequence_lenght, hidden_size] that contains the outputs of each RNN layer after dropout has been performed.
         """
-
         # embedding + dropout
-        embed_drop(self.encoder, self.dropoute)
-        emb = self.encoder(input)
+        emb = self.endecoder(input, training=training)
         emb = self.lockdrop(emb, self.dropouti)
-
-        new_hidden = [] # stores hidden states of each rnn layer
-        new_cell = []
-        raw_outputs = [] # stores outputs directly after each rnn
-        outputs = [] # stores dropout outputs of rnn layers
 
         # pass embedding and the hidden state through all rnn layers
         for n, rnn in enumerate(self.rnns):
-            output, new_h, new_c = rnn(emb, initial_state=[hidden[n], cell[n]]) # call lstm
-            new_hidden.append(new_h)
-            new_cell.append(new_c)
-            raw_outputs.append(output)
+            output, new_h, _ = rnn(emb) # call lstm
+            new_h = tf.stop_gradient(new_h) ## I don't think it works like that!!
             if n < self.nlayers-1: # dropout for all rnn layers but last
                 output = self.lockdrop(output, self.dropouth)
-                outputs.append(output)
-        # dropout for last rnn layer
-        ouput = self.lockdrop(output, self.dropout)
-        outputs.append(output)
-
-        # update the states
-        hidden = new_hidden
-        cell = new_cell
+        ouput = self.lockdrop(output, self.dropout) # dropout for last rnn layer
 
         # decoding
-        if self.tie_weights:
-            self.decoder.set_weights(tf.transpose(self.encoder.get_weights()))
-        decoded = self.decoder(output)
+        decoded = self.endecoder.decode(output)
 
-        if return_h:
-            return decoded, hidden, cell, raw_outputs, outputs
-
-        return decoded, hidden, cell
+        return decoded
 
 
     def reset_metrics(self):
@@ -140,8 +111,9 @@ class RNNModel(tf.keras.Model):
         for metric in self.metrics:
             metric.reset_states()
 
-    #@tf.function
-    def train_step(self, data, hidden, cell, D, N, args, norm=True):
+
+    @tf.function
+    def train_step(self, data, D, N, debiasing, clip=0, norm=True):
         """
         Perform one training step for a given batch of data.
 
@@ -158,45 +130,37 @@ class RNNModel(tf.keras.Model):
             list: A list of updated hidden states for each RNN layer.
             list: A list of updated cell states for each RNN layer.
         """
-        #data is split into inputs and targets
         inputs, targets = data
 
         # update parameters with gradient tape
         with tf.GradientTape() as tape:
 
             # inputs are run through the model to get the predictions
-            predictions, hidden, cell, raw_outputs, dropped_outputs = self(inputs, hidden, cell, return_h=True, training=True)
+            predictions = self(inputs, training=True)
 
             # loss is calculated using targets and predictions
-            loss = self.loss_function(targets, predictions) + tf.reduce_sum(self.losses)#+ bias_loss
+            loss = self.loss_function(targets, predictions) + tf.reduce_sum(self.losses)
 
-            # activation regularization (L2 regularization)
-            if args.alpha > 0:
-                alpha_loss = tf.reduce_sum(args.alpha * tf.mean(tf.pow(output, 2)) for output in dropped_outputs[-1:])
-                loss += alpha_loss
-            # temporal activation regualrization (slowness regularization)
-            if args.beta > 0:
-                beta_loss = tf.reduce_sum(args.beta * tf.mean(tf.pow(output[1:] - output[:-1], 2)) for output in raw_outputs[-1:])
-                loss += beta_loss
-
-            #bias regularization is calculated using gender pairs and neutral words
-            if args.debiasing:
-                bias_loss = bias_regularization_encoder(self, D, N, args.var_ratio, args.lmbda, norm=True)
+            # bias regularization is calculated using gender pairs and neutral words
+            if debiasing:
+                bias_loss = bias_regularization_encoder(self, D, N, var_ratio, lmbda, norm=True)
                 loss += bias_loss
 
-        # gradients are applied to the trainable parameters
+
+        # gradients are clipped and applied to the trainable parameters
         gradients = tape.gradient(loss, self.trainable_variables)
-        gradients, _ = tf.clip_by_global_norm(gradients, args.clip)
+        gradients, _ = tf.clip_by_global_norm(gradients, clip)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
 
         # update loss metric
         self.metrics[0].update_state(loss)
 
         # Return a dictionary mapping metric names to current value and hidden state
-        return {m.name: m.result() for m in self.metrics}, hidden, cell
+        return {m.name: m.result() for m in self.metrics}
 
-    #@tf.function
-    def test_step(self, data, hidden, cell):
+
+    @tf.function
+    def test_step(self, data):
         """
         Performs a single evaluation step for the model on the batch of input data.
 
@@ -213,7 +177,8 @@ class RNNModel(tf.keras.Model):
         """
         # data is split into inputs and targets and the inputs are run through the model to get the predictions
         inputs, targets = data
-        predictions, hidden, cell = self(inputs, cell, training=False)
+
+        predictions = self(inputs, training=False)
 
         # using the targets and the predictions the loss is calculated
         loss = self.loss_function(targets, predictions) + tf.reduce_sum(self.losses)
@@ -221,17 +186,4 @@ class RNNModel(tf.keras.Model):
         # loss metrics are updated
         self.metrics[0].update_state(loss)
 
-        return {m.name: m.result() for m in self.metrics}, hidden, cell
-
-
-    def initialize_state(self, batch_size):
-        """
-        Returns an initial state for the model, consisting of zero-filled tensors for each layer of the model.
-
-        Args:
-            batch_size: An integer representing the size of the input batch.
-
-        Returns:
-            A list of tensors, one for each layer of the model, with shape [batch_size, self.nhid].
-        """
-        return [tf.zeros([batch_size, self.nhid]) for layer in range(self.nlayers)]
+        return {m.name: m.result() for m in self.metrics}

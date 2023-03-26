@@ -15,21 +15,17 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
         train_summary_writer (tensorflow.summary.SummaryWriter): The log writer for training metrics.
         val_summary_writer (tensorflow.summary.SummaryWriter): The log writer for validation metrics.
     """
+    gender_words, D, N = get_gender_pairs(path, args.vocabulary_size, tokenizer)
+
     stored_loss = 100000000
     epochs_since_best_val_set = 0
     for epoch in range(args.epochs):
         print(f"Epoch {epoch+1}/{args.epochs}:")
 
-        gender_words, D, N, eos_idx = get_gender_pairs(args.path, args.vocabulary_size, tokenizer)
-
         # Training:
-        hidden = model.initialize_state(args.train_bsz)
-        cell = model.initialize_state(args.train_bsz)
         for data in tqdm.tqdm(train_ds, position=0, leave=True):
 
-            hidden = [tf.stop_gradient(h) for h in hidden]
-
-            metrics, hidden, cell = model.train_step(data, hidden, cell, D, N, args)
+            metrics = model.train_step(data, D, N, args.debiasing, args.clip)
 
             # logging the validation metrics to the log file which is used by tensorboard
             with train_summary_writer.as_default():
@@ -43,17 +39,13 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
         model.reset_metrics()
 
         # Validation:
-        hidden = model.initialize_states(args.val_bsz)
-        cell = model.initialize_states(args.val_bsz)
         for data in val_ds:
-            metrics, hidden, cell = model.test_step(data, hidden, cell)
+            metrics = model.test_step(data)
 
             # logging the validation metrics to the log file which is used by tensorboard
             with val_summary_writer.as_default():
                 for metric in model.metrics:
                     tf.summary.scalar(f"{metric.name}", metric.result(), step=epoch)
-
-            hidden = [tf.stop_gradient(h) for h in hidden]
 
         print([f"val_{key}: {value.numpy()}" for (key, value) in metrics.items()])
 
@@ -70,10 +62,10 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
             else:
                 epochs_since_best_val_set += 1
                 if epochs_since_best_val_set >= args.patience:
-                    epoch = args.epochs
+                    epoch = epochs
 
 
-def testing(model, test_ds, args):
+def testing(model, test_ds):
     """
     Runs a testing loop for the given model on the provided test dataset.
 
@@ -82,9 +74,7 @@ def testing(model, test_ds, args):
         test_ds: The dataset on which the model should be tested.
         args: An argparse.ArgumentParser object containing all the hyperparamters and necessary arguments.
     """
-    hidden = model.initialize_states(args.test_bsz)
-    cell = model.initialize_states(args.test_bsz)
     for data in test_ds:
-        metrics, hidden, cell = model.test_step(data, hidden, cell)
+        metrics = model.test_step(data)
 
     print([f"test_{key}: {value.numpy()}" for (key, value) in metrics.items()])
