@@ -21,7 +21,7 @@ with open(os.path.join(path, "articles.txt"), 'r', encoding='utf-8') as f:
             break
 
         # filter text + add eos marker
-        chunk = chunk.replace('@highlight', '').replace('\n\n', ' eos ').lower()
+        chunk = chunk.replace('@highlight', '').replace('\n\n', ' <eos ').lower()
         chunk = re.sub(r"[^a-z ]", "", chunk)
 
         # train tokenizer
@@ -31,10 +31,25 @@ with open(os.path.join(path, "articles.txt"), 'r', encoding='utf-8') as f:
 
         text += chunk
 
-# tokenize text
+# serialize tokenizer
+tokenizer_file = open(os.path.join(path, "tokenizer"), 'wb')
+pickle.dump(tokenizer, dict_file)
+dict_file.close()
+print("tokenizer serialized")
+
+# tokenize text in chunks of 1000 sentences
+tokens=[]
 print("begin tokenizing text")
-text = tokenizer.texts_to_sequences(text)
-print("tokenizing finished")
+counter = 0
+start = 0
+for i in range(len(text)):
+    if text[i] == '<':
+        counter += 1
+        if counter > 1000:
+            tokens += tokenizer.texts_to_sequences([text[start:i+4]])[0]
+            counter = 0
+            start = i+1
+    print("tokenizing finished")
 
 # serialize the tokenized text and the word-token dictionary of the tokenizer
 tokens_file = open(os.path.join(path, "text_tokenized"), 'wb')
@@ -44,3 +59,5 @@ tokens_file.close()
 dict_file = open(os.path.join(path, "tokenizer_dict"), 'wb')
 pickle.dump(tokenizer.word_index, dict_file)
 dict_file.close()
+print("text and dict serialized")
+print("***data loading and tokenizing finished!***")
