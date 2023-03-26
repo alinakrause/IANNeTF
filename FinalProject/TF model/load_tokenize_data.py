@@ -47,11 +47,12 @@ for i in range(len(text)):
             tokens += tokenizer.texts_to_sequences([text[start:i+4]])[0]
             counter = 0
             start = i+1
+tokens += tokenizer.texts_to_sequences([text[start:len(text)]])[0]
 print("tokenizing finished")
 
 # serialize the tokenized text and the word-token dictionary of the tokenizer
 tokens_file = open(os.path.join(path, "text_tokenized"), 'wb')
-pickle.dump(text, tokens_file)
+pickle.dump(tokens, tokens_file)
 tokens_file.close()
 
 dict_file = open(os.path.join(path, "tokenizer_dict"), 'wb')
