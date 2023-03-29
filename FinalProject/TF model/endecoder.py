@@ -4,6 +4,19 @@ import tensorflow_probability as tfp
 class EncoderDecoder(tf.keras.layers.Layer):
     """
     A custom layer that serves as an encoder-decoder for embedding and decoding inputs.
+
+    Arguments:
+        input_dim (int): The size of the input vocabulary.
+        output_dim (int): The size of the embedding vectors.
+        dropout (float): The dropout rate to apply during training.
+        embeddings_initializer: The initializer for the embedding weights.
+
+    Methods:
+        build: Initializes the embedding weights matrix with the given initializer.
+        call: Applies the embedding layer with internal dropout to the inputs.
+        decode: Performs a matrix multiplication of the inputs with the transpose of the weight matrix,
+            followed by a softmax activation.
+
     """
     def __init__(self, input_dim, output_dim, dropout, embeddings_initializer):
         """ Initializes the Layer with the given parameters.

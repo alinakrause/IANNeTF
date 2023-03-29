@@ -1,7 +1,15 @@
 import pickle
 
 class SerializeEmbedding():
-    """A class that provides functions for serializing the embeddings weights after 500 batches and at the end of each epoch."""
+    """A class that provides functions for serializing the embeddings weights after 500 batches and at the end of each epoch.
+
+    Arguments:
+        embedding (EncoderDecoder): An instance of the EncoderDecoder class.
+
+    Methods:
+        on_train_batch_end: Updates the batch counter and serializes the embedding weights matrix after every 500 batches.
+        on_epoch_end: Serializes embedding weights matrix after each training epoch.
+    """
 
     def __init__(self, embedding):
         """

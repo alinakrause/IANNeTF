@@ -9,7 +9,7 @@ path1 = "dailymail_stories\dailymail_stories\dailymail\stories"
 path2 = "cnn_stories\cnn_stories\cnn\stories"
 os.chdir(path1)
 
-with open("articles.txt", 'a', encoding='utf-8') as write_file:
+with open(os.path.join(path1, "articles.txt"), 'a', encoding='utf-8') as write_file:
 
     for f in os.listdir():
         if f.endswith(".story"):

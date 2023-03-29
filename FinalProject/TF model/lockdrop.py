@@ -5,12 +5,15 @@ class LockedDropout(tf.keras.layers.Layer):
     """
     Dropout layer that is applied to its inputs in a consistent way across all time steps of RNN.
     Generates a new mask for each forward pass which is then applied across all time steps.
+
+    Methods:
+        call: Applies dropout to the input tensor.
     """
     def __init__(self):
         """ Initializes the LockedDropout layer. """
         super().__init__()
 
-    def call(self, x, dropout=0.5, training=False):
+    def __call__(self, x, dropout=0.5, training=False):
         """
         Applies dropout to the input tensor x.
 

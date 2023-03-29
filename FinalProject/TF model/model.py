@@ -9,6 +9,15 @@ class RNNModel(tf.keras.Model):
     Implements a language model using a multi-layer recurrent neural network (RNN) with long short-term memory (LSTM)
     cells. The model learns to predict the next word in a sequence given the previous words. The network architecture
     consists of an encoder, a decoder, and multiple stacked LSTMs.
+
+    Arguments:
+        args (argparse.ArgumentParser): ArgumentParser containing hyperparameters and important variables for the model and training.
+
+    Methods:
+        call: Forward pass of the model.
+        reset_metrics: Resets the states of all metrics of this model.
+        train_step: Perform one training step for a given batch of data.
+        test_step: Performs a single evaluation step for the model on the batch of input data.
     """
     def __init__(self, args):
         """
@@ -56,7 +65,7 @@ class RNNModel(tf.keras.Model):
         self.rnns = [tf.keras.layers.LSTM(units=self.nhid if n != self.nlayers-1 else self.ninp, activity_regularizer=reg, recurrent_dropout=self.wdrop, return_state=True, return_sequences=True) for n in range(self.nlayers)]
 
 
-    def call(self, input, training=False):
+    def __call__(self, input, training=False):
         """
         Forward pass of the model.
 
