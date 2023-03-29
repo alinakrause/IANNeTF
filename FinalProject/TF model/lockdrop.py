@@ -25,11 +25,9 @@ class LockedDropout(tf.keras.layers.Layer):
         # unchanged if not in training or no dropout
         if not training or not dropout:
             return x
-        # otherwise apply bernoulli mask for dropout
+        # otherwise create and apply bernoulli mask for dropout
         size = x.shape
-        # create mask with dropout rate of bernoulli probability of dropout argument
-        # and normalizes the tensor (if dropout rate is high, mask gets multiplied with larger number)
         mask = tfp.distributions.Bernoulli(probs=(1-dropout), dtype='float32').sample(sample_shape=([1, size[1], size[2]])) / (1 - dropout)
         mask = tf.cast(tf.broadcast_to(mask, size), "float32")
 
-        return mask * x # apply mask on input tensor
+        return mask * x

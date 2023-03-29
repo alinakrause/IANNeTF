@@ -16,12 +16,12 @@ from endecoder import EncoderDecoder
 from model import RNNModel
 from training import training_loop, testing
 from config import config_name
+from ser_embed import SerializeEmbedding
 
+%load_ext tensorboard
 
-#%load_ext tensorboard
-
-# set the hyperparameters
-parser = argparse.ArgumentParser(description="Hyperparameters for training RNN")
+# set global variables and hyperparameters
+parser = argparse.ArgumentParser(description="Hyperparameters and important variables for model and training")
 # data
 parser.add_argument('--path', type=str, default="", help='path to folder where training data and gender pairs are stored')
 parser.add_argument('--vocabulary_size', type=int, default=50000, help='size of the vocabulary of the corpus')
@@ -34,8 +34,6 @@ parser.add_argument('--epochs', type=int, default=500, help='number of epochs fo
 parser.add_argument('--debiasing', type=bool, default=True, help='whether to apply bias regularization')
 parser.add_argument('--var_ratio', type=float, default=0.5, help='ratio of variance used for determining size of gender subspace for bias regularization')
 parser.add_argument('--lmbda', type=float, default=1.0, help='bias regularization loss weight factor')
-#parser.add_argument('--alpha', type=float, default=0.0, help='parameter for L2 regularization on RNN activation (alpha = 0 means no regularization)')
-#parser.add_argument('--beta', type=float, default=0.0, help='parameter for slowness regularization applied on RNN activiation (beta = 0 means no regularization)')
 parser.add_argument('--patience', type=int, default=10, help='early stopping patience (if -1, early stopping is not used)')
 # model
 parser.add_argument('--nlayers', type=int, default=3, help='amount of rnn layers in the model')
@@ -49,20 +47,15 @@ parser.add_argument('--dropouti', type=float, default=0.65, help='dropout for in
 parser.add_argument('--dropoute', type=float, default=0.1, help='dropout to remove words from embedding layer (0 = no dropout)')
 parser.add_argument('--wdrop', type=float, default=0.5, help='amount of weight dropout to apply to the RNN hidden to hidden matrix')
 parser.add_argument('--tie_weights', type=bool, default=True, help='whether to tie encoder and decoder weights')
-parser.add_argument('--clip', type=float, default=0.25, help='gradient clipping')
+parser.add_argument('--clip', type=float, default=0.25, help='ratio of gradient clipping')
 
 args = parser.parse_args()
 
 assert tf.test.is_gpu_available()
 assert tf.test.is_built_with_cuda()
 
-# deserialsize tokenized text and Tokenizer
-tokens_file = open(os.path.join(args.path, "text_tokenized"), 'rb')
-text = pickle.load(tokens_file)
-tokens_file.close()
-tokenizer_file = open(os.path.join(args.path, "tokenizer"), 'rb')
-tokenizer = pickle.load(tokenizer_file)
-tokenizer_file.close()
+# load data and tokenize the text
+text, tokenizer = load_tokenize_data(args.path, args.vocabulary_size)
 
 # split into datasets (60-20-20 ratio)
 l = len(text)
@@ -76,30 +69,21 @@ test_ds = data_preprocessing(test_ds, args.test_bsz, args.bptt, evaluation=True)
 # instantiate model
 model = RNNModel(args)
 
+# class for serializing the embedding weights during the training
+ser_emb = SerializeEmbedding(model.endecoder)
+
 # train the model
-#%tensorboard --logdir logs/
 train_writer, val_writer = config_name()
+%tensorboard --logdir logs/
 training_loop(model=model,
               train_ds=train_ds,
               val_ds=train_ds,
               args=args,
-              tokenizer=word_index,
+              tokenizer=tokenizer,
+              serialize=ser_emb,
               train_summary_writer=train_writer,
               val_summary_writer=val_writer
               )
 
-# get word embeddings matrix
-word_embeddings = model.encoder.weights[0]
-# get word-token dictionary
-token_dict = tokenizer.word_index
-
-# serialize
-emb_file = open(os.path.join(args.path, "word_embedding_{bias}".format(bias = "debiased" if args.debiasing else "biased")), 'wb')
-pickle.dump(word_embeddings, emb_file)
-emb_file.close()
-dict_file = open(os.path.join(args.path, "token_dictionary"), 'wb')
-pickle.dump(token_dict, dict_file)
-dict_file.close()
-
 # testing
-testing(model, test_ds, args)
+testing(model, test_ds)

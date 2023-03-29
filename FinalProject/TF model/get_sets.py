@@ -8,7 +8,9 @@ def get_gender_pairs(path, vocabulary_size, tokenizer):
     in the defining set.
 
     Args:
+        path (str): path of the folder where gender pair file is located.
         vocabulary_size (int): An integer representing the maximum number of words to include in the vocabulary.
+        toknizer (tensorflow.keras.preprocessing.text.Tokenizer): Tokenizer object of the training data.
 
     Returns:
         set: A set of gendered words (both male and female).
@@ -29,8 +31,7 @@ def get_gender_pairs(path, vocabulary_size, tokenizer):
 
     gender_words = set(female_words) | set(male_words)
 
-    # defining set
-    # D: tensor with gendered word pairs (tokenized)
+    # defining set D containing gender pairs
     # shape: (number of gender pairs, 2)
     word_index = tokenizer.word_index # tokenizer dict
     word2idx = {key: word_index[key] for key in list(word_index.keys())[:vocabulary_size]}
@@ -38,7 +39,7 @@ def get_gender_pairs(path, vocabulary_size, tokenizer):
                      for wf, wm in zip(female_words, male_words)
                      if wf in word2idx and wm in word2idx])
 
-    # N: tensor with neutral words (tokenized)
+    # set N containing remaining neutral words
     # shape: (number of gender neutral words)
     N = tf.constant([word2idx[w] for w in word2idx if w not in gender_words])
 

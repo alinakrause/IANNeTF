@@ -2,7 +2,7 @@ import tqdm
 
 from get_sets import get_gender_pairs
 
-def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer, val_summary_writer):
+def training_loop(model, train_ds, val_ds, args, tokenizer, serialize, train_summary_writer, val_summary_writer):
     """
     Trains a given model on the provided training dataset, and evaluates it on a validation dataset for a given number
     of epochs. Calculates training and validation metrics, and logs them to tensorboard.
@@ -12,6 +12,8 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
         train_ds (tensorflow.data.Dataset): The training dataset.
         val_ds (tensorflow.data.Dataset): The validation dataset.
         args (argparse.ArgumentParser): ArgumentParser containing all the hyperparamters and necessary arguments.
+        tokenizer (tensorflow.keras.preprocessing.text.Tokenizer): The tokenizer of the training data.
+        serialize (SerializeEmbedding): Serializer for embedding weights matrix.
         train_summary_writer (tensorflow.summary.SummaryWriter): The log writer for training metrics.
         val_summary_writer (tensorflow.summary.SummaryWriter): The log writer for validation metrics.
     """
@@ -25,7 +27,10 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
         # Training:
         for data in tqdm.tqdm(train_ds, position=0, leave=True):
 
-            metrics = model.train_step(data, D, N, args.debiasing, args.clip)
+            metrics = model.train_step(data, D, N, args.debiasing, args.var_ratio, args.lmbda, args.clip)
+
+            # serialize embeddings
+            serialize.on_train_batch_end()
 
             # logging the validation metrics to the log file which is used by tensorboard
             with train_summary_writer.as_default():
@@ -52,6 +57,9 @@ def training_loop(model, train_ds, val_ds, args, tokenizer, train_summary_writer
         # reset all metrics
         model.reset_metrics()
 
+        # serialize embeddings
+        serialize.on_epoch_end()
+
         print("\n")
 
         # check early stopping
@@ -72,7 +80,6 @@ def testing(model, test_ds):
     Args:
         model: An tf.keras.Model to be tested.
         test_ds: The dataset on which the model should be tested.
-        args: An argparse.ArgumentParser object containing all the hyperparamters and necessary arguments.
     """
     for data in test_ds:
         metrics = model.test_step(data)
