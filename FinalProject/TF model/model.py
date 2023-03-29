@@ -9,33 +9,20 @@ class RNNModel(tf.keras.Model):
     Implements a language model using a multi-layer recurrent neural network (RNN) with long short-term memory (LSTM)
     cells. The model learns to predict the next word in a sequence given the previous words. The network architecture
     consists of an encoder, a decoder, and multiple stacked LSTMs.
-    The model is inspried from the PyTorch implementation "LSTM Language Model Toolkit" by Salesforce:
-    https://github.com/salesforce/awd-lstm-lm
     """
     def __init__(self, args):
         """
         Initializes the RNN model (encoder, decoder and lstm layers) with the given hyperparameters.
 
         Args:
-            args (argparse.ArgumentParser): ArgumentParser containing hyperparameters for the model and training.
-            -> used arguments of ArgumentParser:
-                lr (float): learning rate for the Adam optimizer
-                vocabulary_size (int): vocabulary size
-                ninp (int): size of word embeddings
-                nhid (int): number of hidden units per layer
-                nlayers (int): number of layers
-                dropout (float): dropout rate applied to the output of each LSTM layer (default: 0.5)
-                dropouth (float): dropout rate applied to the output of each LSTM layer (default: 0.5)
-                dropouti (float): dropout rate applied to the embedding layer (default: 0.5)
-                dropoute (float): dropout rate applied to remove words from the embedding layer (default: 0.1)
-                wdrop (float): dropout rate applied to the RNN hidden-to-hidden matrix (default: 0)
+            args (argparse.ArgumentParser): ArgumentParser containing hyperparameters and important variables for the model and training.
         """
         super().__init__()
 
         # training necessities
         self.loss_function = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)
         lr_scheduler = tf.keras.optimizers.schedules.ExponentialDecay(30., 10, 0.9) # decays lr will be decayed with every batch that is processed by the optimizer
-        self.optimizer = tf.keras.optimizers.SGD(learning_rate=lr_scheduler, weight_decay=wdecay)
+        self.optimizer = tf.keras.optimizers.SGD(learning_rate=lr_scheduler, weight_decay=args.wdecay)
         self.metrics_list = [tf.keras.metrics.Mean(name="loss")]
 
         # parameters
@@ -47,9 +34,11 @@ class RNNModel(tf.keras.Model):
         self.dropouti = args.dropouti    # dropout for embedding output
         self.dropouth = args.dropouth    # dropout for rnn layers
         self.dropoute = args.dropoute    # dropout for embedding layer
-        self.wdrop = args.wdrop         # dropout for hidden weights matrix of lstm
-        self.tie_weights = args.tie_weights # whether or not to tie encoder-decoder weights
-        self.lockdrop = LockedDropout() # dropout wrapper
+        self.wdrop = args.wdrop          # dropout for hidden weights matrix of lstm
+        self.tie_weights = args.tie_weights
+
+        # dropout wrapper for dropout on output
+        self.lockdrop = LockedDropout()
 
         # encoder/decoder
         # weights initialized with uniform distribution (-0.1, 0.1)
@@ -62,8 +51,7 @@ class RNNModel(tf.keras.Model):
         )
         self.endecoder.build()
 
-        # rnn layers with L1 + L2 regularizer
-        # wdrop: amount of weight dropout to apply to the RNN hidden to hidden matrix (for lstm: recurrent_kernel)
+        # rnn layers with L1 + L2 regularizer and recurrent dropout
         reg = tf.keras.regularizers.L1L2(l1=0.001, l2=0.002)
         self.rnns = [tf.keras.layers.LSTM(units=self.nhid if n != self.nlayers-1 else self.ninp, activity_regularizer=reg, recurrent_dropout=self.wdrop, return_state=True, return_sequences=True) for n in range(self.nlayers)]
 
@@ -80,13 +68,8 @@ class RNNModel(tf.keras.Model):
             training (bool): Whether the model is in training mode or not. Default is False.
 
         Returns:
-            Tuple of (decoded, hidden, cell) if return_h is False, else
-            Tuple of (decoded, hidden, cell, raw_outputs, outputs), where
-                decoded (tf.Tensor): Tensor with shape [batch_size, output_size] that contains the output of the decoder layer.
-                hidden (list): list of Tensors, each with shape [batch_size, hidden_size] that contains the hidden states of each RNN layer.
-                cell (list): list of Tensors, each with shape [batch_size, hidden_size] that contains the cell states of each RNN layer.
-                raw_outputs (list): list of Tensors, each with shape [batch_size, sequence_length, hidden_size] that contains the outputs directly after each RNN layer.
-                outputs (list): list of Tensors, each with shape [batch_size, sequence_lenght, hidden_size] that contains the outputs of each RNN layer after dropout has been performed.
+            decoded (tf.Tensor): Tensor with shape [batch_size, ninp, voc_size+1] that contains the output of the decoder layer.
+
         """
         # embedding + dropout
         emb = self.endecoder(input, training=training)
@@ -95,7 +78,7 @@ class RNNModel(tf.keras.Model):
         # pass embedding and the hidden state through all rnn layers
         for n, rnn in enumerate(self.rnns):
             output, new_h, _ = rnn(emb) # call lstm
-            new_h = tf.stop_gradient(new_h) ## I don't think it works like that!!
+            new_h = tf.stop_gradient(new_h)
             if n < self.nlayers-1: # dropout for all rnn layers but last
                 output = self.lockdrop(output, self.dropouth)
         ouput = self.lockdrop(output, self.dropout) # dropout for last rnn layer
@@ -119,10 +102,10 @@ class RNNModel(tf.keras.Model):
 
         Args:
             data (tuple): A tuple of input and target data.
-            hidden (list): A list of hidden states for each RNN layer.
-            cell (list): A list of cell states for each RNN layer.
             D (tf.Tensor): A tensor of shape (d,) representing the gender direction vector.
             N (tf.Tensor): A tensor of shape (d, n) representing the bias subspace.
+            debiasing (bool): Whether to compute and add the bias regularization loss term.
+            clip (float): Ratio for clipping gradients (0 means no gradient clipping).
             norm (bool): Whether to normalize the gender direction vector (default=True).
 
         Returns:
@@ -166,13 +149,9 @@ class RNNModel(tf.keras.Model):
 
         Args:
             data (tuple): A tuple of Tensors containing the input data and corresponding targets.
-            hidden (list): A list of hidden states for each RNN layer.
-            cell (list): A list of cell states for each RNN layer.
 
         Returns:
             dict: A dictionary mapping metric names to current value.
-            list: A list of updated hidden states for each RNN layer.
-            list: A list of updated cell states for each RNN layer.
 
         """
         # data is split into inputs and targets and the inputs are run through the model to get the predictions
