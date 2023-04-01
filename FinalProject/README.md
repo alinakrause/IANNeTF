@@ -4,6 +4,7 @@ This repository contains the code for a university course project, implementing 
 
 Authors: Imogen Huesing (ihuesing@uos.de), Paula Heigl (pheigl@uos.de)
 
+[Link to the video of the project](https://youtu.be/0vZJXA0rGx4)
 
 ## Model including debiasing
 
@@ -13,7 +14,7 @@ As mentioned in References, the underlying RNN language model implementeation is
 
 ### Execution
 
-1. Download the CNN/DailyMail articles from https://cs.nyu.edu/~kcho/DMQA/.
+1. Download the CNN/DailyMail articles from [here](https://cs.nyu.edu/~kcho/DMQA/).
 2. Run the extract_data.py file for both the CNN articles and the DailyMail articles.
 3. Optional: make any adjustments to the training and model parameter in the ArgumentParser at the top of the main file, e.g. whether or not to include the bias regularization.
 4. Run the main.py file. This will preprocess the extracted data and train the model on the data and serialize the embeddings.
